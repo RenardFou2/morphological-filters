@@ -49,9 +49,9 @@ const ImageProcessor = () => {
         }
   
         const pixelIndex = (y * width + x) * 4;
-        result[pixelIndex] = max; // Red channel
-        result[pixelIndex + 1] = max; // Green channel
-        result[pixelIndex + 2] = max; // Blue channel
+        result[pixelIndex] = max; // Red
+        result[pixelIndex + 1] = max; // Green
+        result[pixelIndex + 2] = max; // Blue
       }
     }
   
@@ -75,9 +75,9 @@ const ImageProcessor = () => {
         }
   
         const pixelIndex = (y * width + x) * 4;
-        result[pixelIndex] = min; // Red channel
-        result[pixelIndex + 1] = min; // Green channel
-        result[pixelIndex + 2] = min; // Blue channel
+        result[pixelIndex] = min; // Red
+        result[pixelIndex + 1] = min; // Green
+        result[pixelIndex + 2] = min; // Blue
       }
     }
   
@@ -93,6 +93,68 @@ const ImageProcessor = () => {
     const dilated = applyDilation(pixels, width, height, structuringElement);
     return applyErosion(dilated, width, height, structuringElement);
   };
+
+  const hitStructuringElement = [
+    [0, 1, 0],
+    [1, 1, 1],
+    [0, 1, 0],
+  ];
+  
+  const missStructuringElement = [
+    [1, 0, 1],
+    [0, 0, 0],
+    [1, 0, 1],
+  ];
+
+  const applyHitOrMiss = (pixels, width, height) => {
+    const result = new Uint8ClampedArray(pixels);
+  
+    for (let i = 0; i < pixels.length; i += 4) {
+      const gray = pixels[i] > 128 ? 255 : 0; // Jeśli wartość piksela > 128, ustaw na biały
+      pixels[i] = gray; // R
+      pixels[i + 1] = gray; // G
+      pixels[i + 2] = gray; // B
+    }
+  
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let isHit = true;
+        let isMiss = true;
+  
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const pixelIndex = ((y + i) * width + (x + j)) * 4;
+            const structValue = hitStructuringElement[i + 1][j + 1];
+  
+            if (structValue === 1 && pixels[pixelIndex] === 0) {
+              isHit = false;
+            }
+          }
+        }
+  
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const pixelIndex = ((y + i) * width + (x + j)) * 4;
+            const structValue = missStructuringElement[i + 1][j + 1];
+  
+            if (structValue === 1 && pixels[pixelIndex] === 255) {
+              isMiss = false;
+            }
+          }
+        }
+  
+        const resultIndex = (y * width + x) * 4;
+        const value = isHit && isMiss ? 255 : 0;
+  
+        
+        result[resultIndex] = value;
+        result[resultIndex + 1] = value;
+        result[resultIndex + 2] = value;
+      }
+    }
+  
+    return result;
+  };
   
 
   const applyFilter = () => {
@@ -102,7 +164,6 @@ const ImageProcessor = () => {
 
     const { width, height, data } = imageData;
 
-    // Wybierz odpowiedni filtr
     let resultPixels;
     if (filter === 'dilation') {
       resultPixels = applyDilation(data, width, height, structuringElement);
@@ -112,9 +173,10 @@ const ImageProcessor = () => {
       resultPixels = applyOpening(data, width, height, structuringElement);
     } else if (filter === 'closing') {
       resultPixels = applyClosing(data, width, height, structuringElement);
+    } else if (filter === 'hit-or-miss') {
+      resultPixels = applyHitOrMiss(data, width, height);
     }
 
-    // Wyświetl wynik w drugim canvasie
     const resultCanvas = resultCanvasRef.current;
     const resultCtx = resultCanvas.getContext('2d');
     resultCanvas.width = width;
